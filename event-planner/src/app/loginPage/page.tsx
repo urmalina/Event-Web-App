@@ -1,14 +1,38 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [message, setMessage] = useState(""); // Сообщение об ошибке
+  const router = useRouter(); // Используем для редиректа
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Авторизация:", { email, password });
+
+    // 1️⃣ Отправляем данные на сервер
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    // 2️⃣ Обрабатываем ответ
+    const data = await res.json();
+    setMessage(data.message);
+
+    if (res.ok) {
+      // 🔥 Редирект в зависимости от роли
+      if (data.role === "ORGANIZER") {
+        router.push("/welcome");
+      } else if (data.role === "PROVIDER") {
+        router.push("/welcomeService");
+      } else {
+        setMessage("Ошибка определения роли пользователя.");
+      }
+    }
   };
 
   return (
@@ -49,9 +73,12 @@ export default function LoginPage() {
             Войти
           </button>
         </form>
+
+        {message && <p className="mt-4 text-center text-sm text-red-500">{message}</p>}
+
         <p className="mt-4 text-center text-sm text-gray-600">
           Нет аккаунта?{" "}
-          <a href="/register" className="text-mustard hover:underline">
+          <a href="/registration" className="text-mustard hover:underline">
             Зарегистрироваться
           </a>
         </p>

@@ -1,0 +1,96 @@
+// Подключение базы данных PostgreSQL
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+/// Таблица пользователей
+model User {
+  id            String         @id @default(uuid())
+  name          String
+  email         String         @unique
+  password      String
+  role          UserRole       @default(USER) // Используем ENUM для ролей
+  events        Event[]        @relation("OrganizerEvents")
+  bookings      Booking[]
+  notifications Notification[]
+  services      Service[]      @relation("ProviderServices") // Связь с размещёнными услугами
+  createdAt     DateTime       @default(now())
+}
+
+/// Роли пользователей
+enum UserRole {
+  USER       // Обычный пользователь (не используется)
+  ORGANIZER  // Организатор мероприятий
+  PROVIDER   // Поставщик услуг
+}
+
+/// Таблица мероприятий (создаются только организаторами)
+model Event {
+  id        String         @id @default(uuid())
+  title     String
+  date      DateTime
+  location  String
+  budget    Int
+  organizerId String
+  organizer User           @relation("OrganizerEvents", fields: [organizerId], references: [id])
+  services  EventService[]
+  bookings  Booking[]
+  status    String         @default("draft") // "draft" | "confirmed"
+  createdAt DateTime       @default(now())
+}
+
+/// Услуги (размещаются поставщиками)
+model Service {
+  id          String       @id @default(uuid())
+  name        String
+  category    String
+  price       Int
+  providerId  String
+  provider    User         @relation("ProviderServices", fields: [providerId], references: [id])
+  bookings    Booking[]
+  eventServices EventService[]
+  createdAt   DateTime     @default(now())
+}
+
+/// Промежуточная таблица "EventService" (связь "многие ко многим" между `Event` и `Service`)
+model EventService {
+  id        String  @id @default(uuid())
+  eventId   String
+  serviceId String
+  event     Event   @relation(fields: [eventId], references: [id])
+  service   Service @relation(fields: [serviceId], references: [id])
+}
+
+/// Таблица бронирований (Booking)
+model Booking {
+  id             String   @id @default(uuid())
+  userId         String
+  eventId        String
+  serviceId      String
+  status         String   @default("pending") // "pending" | "confirmed" | "cancelled"
+  user           User     @relation(fields: [userId], references: [id])
+  event          Event    @relation(fields: [eventId], references: [id])
+  service        Service  @relation(fields: [serviceId], references: [id])
+  
+  startTime      DateTime // Начало бронирования
+  endTime        DateTime // Конец бронирования (если фиксировано)
+  durationMinutes Int?    // Длительность услуги в минутах (если услуга фиксированная)
+  
+  createdAt      DateTime @default(now())
+}
+
+
+/// Уведомления для пользователей
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  message   String
+  status    String   @default("unread") // "unread" | "read"
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
