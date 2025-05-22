@@ -11,12 +11,10 @@ const RegistrationPage = () => {
   });
   const [message, setMessage] = useState("");
 
-  // Функция для обновления состояния формы
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  // Обработчик отправки формы
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -88,7 +86,7 @@ const RegistrationPage = () => {
                 <input
                   type="radio"
                   name="role"
-                  value="organizer"
+                  value="ORGANIZER"
                   checked={form.role === "ORGANIZER"}
                   onChange={handleChange}
                   required
@@ -100,7 +98,7 @@ const RegistrationPage = () => {
                 <input
                   type="radio"
                   name="role"
-                  value="provider"
+                  value="PROVIDER"
                   checked={form.role === "PROVIDER"}
                   onChange={handleChange}
                   required

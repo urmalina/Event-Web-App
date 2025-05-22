@@ -1,4 +1,3 @@
-// Подключение базы данных PostgreSQL
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -8,89 +7,152 @@ generator client {
   provider = "prisma-client-js"
 }
 
-/// Таблица пользователей
+generator erd {
+  provider      = "prisma-erd-generator"
+  output        = "./erd/ERD.svg"
+  outputFormat  = "svg"
+}
+
+enum UserRole {
+  USER
+  ORGANIZER
+  PROVIDER
+}
+
+enum PriceType {
+  DAY
+  HOUR
+}
+
+enum Weekday {
+  MON
+  TUE
+  WED
+  THU
+  FRI
+  SAT
+  SUN
+}
+
 model User {
   id            String         @id @default(uuid())
   name          String
   email         String         @unique
   password      String
-  role          UserRole       @default(USER) // Используем ENUM для ролей
+  createdAt     DateTime       @default(now())
+  role          UserRole       @default(USER)
+
   events        Event[]        @relation("OrganizerEvents")
   bookings      Booking[]
   notifications Notification[]
-  services      Service[]      @relation("ProviderServices") // Связь с размещёнными услугами
-  createdAt     DateTime       @default(now())
+  services      Service[]      @relation("ProviderServices")
 }
 
-/// Роли пользователей
-enum UserRole {
-  USER       // Обычный пользователь (не используется)
-  ORGANIZER  // Организатор мероприятий
-  PROVIDER   // Поставщик услуг
-}
-
-/// Таблица мероприятий (создаются только организаторами)
 model Event {
-  id        String         @id @default(uuid())
-  title     String
-  date      DateTime
-  location  String
-  budget    Int
-  organizerId String
-  organizer User           @relation("OrganizerEvents", fields: [organizerId], references: [id])
-  services  EventService[]
-  bookings  Booking[]
-  status    String         @default("draft") // "draft" | "confirmed"
-  createdAt DateTime       @default(now())
-}
-
-/// Услуги (размещаются поставщиками)
-model Service {
-  id          String       @id @default(uuid())
-  name        String
-  category    String
-  price       Int
-  providerId  String
-  provider    User         @relation("ProviderServices", fields: [providerId], references: [id])
-  bookings    Booking[]
-  eventServices EventService[]
-  createdAt   DateTime     @default(now())
-}
-
-/// Промежуточная таблица "EventService" (связь "многие ко многим" между `Event` и `Service`)
-model EventService {
-  id        String  @id @default(uuid())
-  eventId   String
-  serviceId String
-  event     Event   @relation(fields: [eventId], references: [id])
-  service   Service @relation(fields: [serviceId], references: [id])
-}
-
-/// Таблица бронирований (Booking)
-model Booking {
-  id             String   @id @default(uuid())
+  id             String         @id @default(uuid())
   userId         String
-  eventId        String
-  serviceId      String
-  status         String   @default("pending") // "pending" | "confirmed" | "cancelled"
-  user           User     @relation(fields: [userId], references: [id])
-  event          Event    @relation(fields: [eventId], references: [id])
-  service        Service  @relation(fields: [serviceId], references: [id])
-  
-  startTime      DateTime // Начало бронирования
-  endTime        DateTime // Конец бронирования (если фиксировано)
-  durationMinutes Int?    // Длительность услуги в минутах (если услуга фиксированная)
-  
-  createdAt      DateTime @default(now())
+  title          String?
+  type           String?
+  date           DateTime?
+  guestsCount    Int?
+  location       String?
+  budget         Int?
+  draft          Boolean        @default(true)
+  status         String         @default("draft")
+  createdAt      DateTime       @default(now())
+
+  user           User           @relation("OrganizerEvents", fields: [userId], references: [id])
+  venueId        String?
+  venue          Service?       @relation("VenueDraft", fields: [venueId], references: [id])
+
+  bookings       Booking[]
+  services       EventService[]
 }
 
+model EventService {
+  id            String    @id @default(uuid())
+  eventId       String
+  serviceId     String
+  draft         Boolean   @default(true)
+  selectedStart DateTime?
+  selectedEnd   DateTime?
 
-/// Уведомления для пользователей
+  event         Event     @relation(fields: [eventId], references: [id])
+  service       Service   @relation(fields: [serviceId], references: [id])
+}
+
+model Service {
+  id              String                @id @default(uuid())
+  name            String
+  category        String
+  price           Int
+  priceType       PriceType
+  city            String
+  description     String
+  photos          String[]
+  createdAt       DateTime              @default(now())
+
+  providerId      String
+  provider        User                  @relation("ProviderServices", fields: [providerId], references: [id])
+
+  availabilityId  String?
+  availability    AvailabilitySchedule? @relation(fields: [availabilityId], references: [id])
+
+  capacity        Int?
+  venueType       String?
+  experience      Int?
+  location        String?
+  workFormats     String[]
+
+  bookings        Booking[]
+  venueDrafts     Event[]               @relation("VenueDraft")
+  bookingSlots    BookingSlot[]         @relation("ServiceToBookingSlots")
+  eventServices   EventService[]
+}
+
+model AvailabilitySchedule {
+  id        String    @id @default(uuid())
+  days      Weekday[]
+  startTime String
+  endTime   String
+
+  services  Service[]
+}
+
+model Booking {
+  id              String   @id @default(uuid())
+  userId          String
+  eventId         String
+  serviceId       String
+  status          String   @default("pending")
+  createdAt       DateTime @default(now())
+
+  startTime       DateTime
+  endTime         DateTime
+  durationMinutes Int?
+
+  user            User     @relation(fields: [userId], references: [id])
+  event           Event    @relation(fields: [eventId], references: [id])
+  service         Service  @relation(fields: [serviceId], references: [id])
+}
+
 model Notification {
   id        String   @id @default(uuid())
   userId    String
   message   String
-  status    String   @default("unread") // "unread" | "read"
-  user      User     @relation(fields: [userId], references: [id])
+  status    String   @default("unread")
   createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model BookingSlot {
+  id        String      @id @default(uuid())
+  serviceId String
+  date      DateTime
+  endDate   DateTime
+  type      PriceType
+  createdAt DateTime    @default(now())
+
+  service   Service     @relation("ServiceToBookingSlots", fields: [serviceId], references: [id])
 }

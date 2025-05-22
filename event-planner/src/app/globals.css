@@ -127,3 +127,16 @@
     @apply bg-background text-foreground;
   }
 }
+
+nextjs-portal {
+  display: none !important;
+}
+
+body > nextjs-portal {
+  display: none !important;
+}
+
+body > nextjs-portal * {
+  display: none !important;
+}
+

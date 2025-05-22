@@ -1,0 +1,12 @@
+{
+    "theme": "neutral",
+    "fontFamily": "Times New Roman",
+    "fontSize": 14,
+    "flowchart": {
+      "curve": "linear",
+      "nodeSpacing": 40,
+      "rankSpacing": 30,
+      "useMaxWidth": false
+    }
+  }
+  

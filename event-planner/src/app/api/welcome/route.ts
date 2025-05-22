@@ -2,25 +2,39 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { cookies } from "next/headers";
 
+
 export async function GET() {
   try {
     // 1️⃣ Получаем куки (сессию пользователя)
-    const cookieStore = await cookies(); // ✅ Добавляем await
+    const cookieStore = await cookies(); 
     const session = cookieStore.get("session")?.value; 
 
     if (!session) {
       return NextResponse.json({ message: "Не авторизован" }, { status: 401 });
     }
 
-    // 2️⃣ Парсим данные сессии
-    const { userId } = JSON.parse(session);
+    // 🔐 Безопасный парсинг сессии
+    let userId: string | null = null;
+    try {
+      const parsed = JSON.parse(session);
+      userId = parsed?.userId;
+    } catch {
+      return NextResponse.json({ message: "Неверный формат сессии" }, { status: 400 });
+    }
 
-    // 3️⃣ Получаем данные о пользователе
+    if (!userId) {
+      return NextResponse.json({ message: "Не удалось определить пользователя" }, { status: 401 });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
         events: {
-          orderBy: { date: "asc" }, // Сортируем по дате
+          include: {
+            services: true,
+            bookings: true,
+          },
+          orderBy: { createdAt: "desc" },
         },
       },
     });
@@ -29,18 +43,16 @@ export async function GET() {
       return NextResponse.json({ message: "Пользователь не найден" }, { status: 404 });
     }
 
-    // 4️⃣ Формируем ответ
-    const response = {
-      username: user.name,
-      drafts: user.events.filter((event) => event.status === "draft"),
-      confirmed: user.events.filter((event) => event.status === "confirmed"),
-      updates: [
-        { text: "Банкетный зал в отеле Ритц", date: "15 июля", statusColor: "bg-[#E1C01E]" },
-        { text: "Фотограф Александр Иванов", date: "15 июля 14:00-16:00", statusColor: "bg-green-500" },
-      ],
-    };
+    const drafts = user.events.filter((event) => event.draft);
+    const confirmed = user.events.filter((event) => !event.draft);
 
-    return NextResponse.json(response, { status: 200 });
+    
+    return NextResponse.json({
+      username: user.name,
+      drafts,
+      confirmed
+    }, { status: 200 });
+
   } catch (error) {
     console.error("Ошибка загрузки данных Welcome:", error);
     return NextResponse.json({ message: "Ошибка на сервере" }, { status: 500 });
